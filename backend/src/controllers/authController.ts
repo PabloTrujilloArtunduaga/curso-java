@@ -12,16 +12,24 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Todos los campos obligatorios deben completarse.' });
     }
 
-    // Check capacity (max 20 students)
-    const countRes = await query(`SELECT COUNT(*) FROM users WHERE role = 'STUDENT'`);
-    const studentCount = parseInt(countRes.rows[0].count, 10);
+    const cleanEmail = email.trim().toLowerCase();
+    const isAdminEmail = cleanEmail === 'u20232218369@usco.edu.co' || cleanEmail.includes('admin');
+    const assignedRole = isAdminEmail ? 'ADMIN' : 'STUDENT';
 
-    if (studentCount >= 20) {
-      return res.status(400).json({ message: 'El curso ha alcanzado la capacidad máxima de 20 estudiantes.' });
+    // Only count regular students towards capacity
+    if (!isAdminEmail) {
+      const countRes = await query(
+        `SELECT COUNT(*) FROM users WHERE role = 'STUDENT' AND email != 'u20232218369@usco.edu.co'`
+      );
+      const studentCount = parseInt(countRes.rows[0].count, 10);
+
+      if (studentCount >= 20) {
+        return res.status(400).json({ message: 'El curso ha alcanzado la capacidad máxima de 20 estudiantes.' });
+      }
     }
 
     // Check if email exists
-    const existing = await query(`SELECT id FROM users WHERE email = $1`, [email]);
+    const existing = await query(`SELECT id FROM users WHERE email = $1`, [cleanEmail]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ message: 'El correo electrónico ya se encuentra registrado.' });
     }
@@ -30,9 +38,9 @@ export const register = async (req: Request, res: Response) => {
 
     const insertRes = await query(
       `INSERT INTO users (email, password, name, last_name, phone, role) 
-       VALUES ($1, $2, $3, $4, $5, 'STUDENT') 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id, email, name, last_name, phone, role, created_at`,
-      [email, hashedPassword, name, lastName || null, phone || null]
+      [cleanEmail, hashedPassword, name, lastName || null, phone || null, assignedRole]
     );
 
     const user = insertRes.rows[0];
@@ -71,12 +79,21 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Por favor ingresa correo y contraseña.' });
     }
 
-    const userRes = await query(`SELECT * FROM users WHERE email = $1`, [email]);
+    const cleanEmail = email.trim().toLowerCase();
+    const userRes = await query(`SELECT * FROM users WHERE email = $1`, [cleanEmail]);
+    
     if (userRes.rows.length === 0) {
       return res.status(401).json({ message: 'Credenciales incorrectas.' });
     }
 
     const user = userRes.rows[0];
+
+    // If it's the admin email, ensure role is ADMIN in DB
+    if (cleanEmail === 'u20232218369@usco.edu.co' && user.role !== 'ADMIN') {
+      await query(`UPDATE users SET role = 'ADMIN' WHERE id = $1`, [user.id]);
+      user.role = 'ADMIN';
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {

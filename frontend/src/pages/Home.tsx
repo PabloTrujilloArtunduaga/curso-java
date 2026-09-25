@@ -1,138 +1,130 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Trophy, Users, CheckCircle, ShieldCheck } from 'lucide-react';
+import { api } from '../services/api';
+import { Trophy, Users, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 
 export const Home = () => {
   const { user } = useAuth();
+  const [studentCount, setStudentCount] = useState<number>(0);
+
+  useEffect(() => {
+    api.getStudentsCount().then(setStudentCount);
+  }, []);
 
   return (
-    <div className="bg-white">
+    <div className="bg-slate-950 text-white min-h-screen flex flex-col">
+      
       {/* Hero Section */}
-      <div className="relative bg-blue-900 overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            className="w-full h-full object-cover opacity-20"
-            src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
-            alt="Código Java en pantalla"
-          />
-          <div className="absolute inset-0 bg-blue-900 mix-blend-multiply" />
-        </div>
-        <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8 flex flex-col items-center text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl mb-6">
-            Aprende Java desde Cero
+      <div className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-purple-950/40 to-slate-950 py-24 sm:py-32">
+        
+        {/* Glow effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-purple-600/20 blur-[140px] rounded-full pointer-events-none"></div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
+          
+          <div className="inline-flex items-center gap-2 bg-purple-900/50 border border-purple-500/30 px-4 py-1.5 rounded-full text-xs font-black text-purple-300 mb-8 backdrop-blur-md shadow-lg">
+            <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+            <span>Curso Presencial de Java — Universidad Surcolombiana</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight max-w-4xl text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-purple-300 leading-tight mb-6">
+            Aprende Java desde Cero con Arquitectura Profesional
           </h1>
-          <p className="mt-6 text-xl text-blue-100 max-w-3xl">
-            Domina uno de los lenguajes de programación más demandados del mundo en nuestro curso presencial. Cupos limitados a 20 estudiantes.
+
+          <p className="text-slate-300 text-lg sm:text-xl max-w-2xl leading-relaxed mb-10">
+            Curso práctico de 10 horas en 5 semanas. Control de asistencia mediante QR dinámico, acceso progresivo y certificación oficial al completar el 100%.
           </p>
-          <div className="mt-10 flex gap-4">
+
+          {/* Medidor de Cupos en Vivo */}
+          <div className="bg-slate-900/80 border border-purple-500/30 backdrop-blur-md px-6 py-3 rounded-2xl mb-10 flex items-center gap-4 shadow-xl">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Cupos Ocupados:</span>
+            </div>
+            <span className="text-lg font-black text-purple-300">
+              {studentCount} / 20 Estudiantes
+            </span>
+            <span className="text-xs text-slate-400 font-medium border-l border-slate-700 pl-4">
+              {studentCount < 10 ? `Faltan ${10 - studentCount} para el mínimo` : '¡Curso habilitado para iniciar!'}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             {!user ? (
               <>
                 <Link
                   to="/register"
-                  className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-900 bg-white hover:bg-gray-50 shadow-lg transition-transform hover:scale-105"
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black px-8 py-4 rounded-xl shadow-xl shadow-purple-600/25 transition-all text-base flex items-center justify-center gap-2 group"
                 >
-                  Inscribirse Ahora
+                  Inscribirme al Curso <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link
                   to="/login"
-                  className="inline-flex items-center justify-center px-8 py-3 border-2 border-white text-base font-medium rounded-md text-white hover:bg-blue-800 transition-colors"
+                  className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-bold px-8 py-4 rounded-xl border border-slate-700 transition-all text-base flex items-center justify-center"
                 >
-                  Ya soy alumno
+                  Ya soy Estudiante (Ingresar)
                 </Link>
               </>
             ) : (
               <Link
                 to={user.role === 'ADMIN' ? '/admin' : '/dashboard'}
-                className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-900 bg-white hover:bg-gray-50 shadow-lg"
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black px-8 py-4 rounded-xl shadow-xl shadow-purple-600/25 transition-all text-base flex items-center justify-center gap-2"
               >
-                Ir a mi Panel
+                Ir a mi Panel de {user.role === 'ADMIN' ? 'Profesor' : 'Estudiante'} <ArrowRight className="w-5 h-5" />
               </Link>
             )}
           </div>
+
         </div>
       </div>
 
-      {/* Características */}
-      <div className="py-20 bg-gray-50">
+      {/* Características principales */}
+      <div className="py-20 bg-slate-900/60 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
           <div className="text-center mb-16">
-            <h2 className="text-base font-semibold text-blue-600 tracking-wide uppercase">Metodología</h2>
-            <p className="mt-2 text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              ¿Por qué tomar este curso?
-            </p>
+            <h2 className="text-xs font-black text-purple-400 tracking-widest uppercase mb-2">Metodología Presencial</h2>
+            <p className="text-3xl sm:text-4xl font-black text-white">¿Por qué este curso de Java?</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-6">
-                <Users className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Clases Presenciales</h3>
-              <p className="text-gray-600">Grupos reducidos de máximo 20 personas para garantizar atención personalizada.</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-6">
-                <ShieldCheck className="h-8 w-8 text-blue-600" />
+            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl border border-slate-800 shadow-xl hover:border-purple-500/40 transition-all">
+              <div className="bg-purple-900/50 p-4 rounded-2xl w-fit border border-purple-500/30 mb-6">
+                <Users className="w-8 h-8 text-purple-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Asistencia Segura QR</h3>
-              <p className="text-gray-600">Sistema moderno anti-fraude. Tu celular genera un código único que el profesor escanea.</p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-6">
-                <Trophy className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Certificación Final</h3>
-              <p className="text-gray-600">Al completar todos los módulos teóricos y prácticos obtendrás tu certificado avalado.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Requisitos / Info extra */}
-      <div className="py-16 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
-            <div>
-              <h3 className="text-2xl font-extrabold text-gray-900 tracking-tight sm:text-3xl">
-                Requisitos de Inscripción
-              </h3>
-              <p className="mt-4 text-lg text-gray-500">
-                Para mantener la calidad académica, el curso tiene condiciones específicas para los aplicantes.
+              <h3 className="text-xl font-bold text-white mb-2">Cupos Controlados</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                Mínimo 10 y máximo 20 estudiantes por grupo presencial para asegurar un acompañamiento directo.
               </p>
-              <dl className="mt-8 space-y-6">
-                <div className="flex">
-                  <CheckCircle className="flex-shrink-0 h-6 w-6 text-green-500" aria-hidden="true" />
-                  <div className="ml-3">
-                    <dt className="text-lg font-medium text-gray-900">Correo Institucional</dt>
-                    <dd className="mt-1 text-gray-500">Obligatorio usar correo con dominio @usco.edu.co.</dd>
-                  </div>
-                </div>
-                <div className="flex">
-                  <CheckCircle className="flex-shrink-0 h-6 w-6 text-green-500" aria-hidden="true" />
-                  <div className="ml-3">
-                    <dt className="text-lg font-medium text-gray-900">Cupo Limitado</dt>
-                    <dd className="mt-1 text-gray-500">Solo se habilitan 20 espacios por cohorte.</dd>
-                  </div>
-                </div>
-                <div className="flex">
-                  <CheckCircle className="flex-shrink-0 h-6 w-6 text-green-500" aria-hidden="true" />
-                  <div className="ml-3">
-                    <dt className="text-lg font-medium text-gray-900">Dispositivo Móvil</dt>
-                    <dd className="mt-1 text-gray-500">Necesitarás tu celular para generar el QR de asistencia en cada clase presencial.</dd>
-                  </div>
-                </div>
-              </dl>
             </div>
-            <div className="mt-12 lg:mt-0 relative">
-              <img
-                className="rounded-xl shadow-2xl"
-                src="https://images.unsplash.com/photo-1531482615713-2afd69097998?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80"
-                alt="Estudiantes trabajando en computadoras"
-              />
+
+            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl border border-slate-800 shadow-xl hover:border-purple-500/40 transition-all">
+              <div className="bg-purple-900/50 p-4 rounded-2xl w-fit border border-purple-500/30 mb-6">
+                <ShieldCheck className="w-8 h-8 text-purple-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Asistencia QR Dinámica</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                El profesor proyecta un código QR con expiración en clase. Tú lo escaneas con tu celular para registrar tu presencia.
+              </p>
             </div>
+
+            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-2xl border border-slate-800 shadow-xl hover:border-purple-500/40 transition-all">
+              <div className="bg-purple-900/50 p-4 rounded-2xl w-fit border border-purple-500/30 mb-6">
+                <Trophy className="w-8 h-8 text-purple-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Certificación al 100%</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                Al completar la asistencia y práctica de las 5 semanas obtendrás tu constancia de finalización exitosa del curso.
+              </p>
+            </div>
+
           </div>
+
         </div>
       </div>
 
