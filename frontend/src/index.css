@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3b82f6; /* blue-500 */
-  --color-primary-dark: #2563eb; /* blue-600 */
+  --color-primary: #2563eb; /* blue-600 */
+  --color-primary-hover: #1d4ed8; /* blue-700 */
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8fafc; /* slate-50 */
 }
 
 body {
@@ -12,10 +14,10 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f9fafb;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

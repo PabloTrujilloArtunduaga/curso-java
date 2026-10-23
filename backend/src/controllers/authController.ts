@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../db/index.js';
+import { query, pool } from '../db/index.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+import { getEnv } from '../config/env.js';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -12,44 +15,83 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Todos los campos obligatorios deben completarse.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const isAdminEmail = cleanEmail === 'u20232218369@usco.edu.co' || cleanEmail.includes('admin');
-    const assignedRole = isAdminEmail ? 'ADMIN' : 'STUDENT';
+    if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({ message: 'Formato de correo electrónico inválido.' });
+    }
 
-    // Only count regular students towards capacity
-    if (!isAdminEmail) {
-      const countRes = await query(
-        `SELECT COUNT(*) FROM users WHERE role = 'STUDENT' AND email != 'u20232218369@usco.edu.co'`
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: 'El nombre es obligatorio.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim().slice(0, 100);
+    const cleanLastName = typeof lastName === 'string' ? lastName.trim().slice(0, 100) : null;
+    const cleanPhone = typeof phone === 'string' ? phone.trim().slice(0, 50) : null;
+
+    const { ADMIN_EMAIL, JWT_SECRET } = getEnv();
+
+    // Protección contra apropiación de la cuenta del docente
+    if (cleanEmail === ADMIN_EMAIL) {
+      return res.status(400).json({
+        message: 'Este correo está reservado para el docente del curso y debe ser aprovisionado mediante el procedimiento seguro del servidor.'
+      });
+    }
+
+    // Ningún registro público puede asignarse el rol ADMIN; siempre es STUDENT
+    const assignedRole = 'STUDENT';
+
+    // Verificación atómica de cupo e inserción con transacción y advisory lock para prevenir race conditions
+    const client = await pool.connect();
+    let user;
+    try {
+      await client.query('BEGIN');
+      // Adquirir bloqueo consultivo a nivel de transacción para serializar concurrentes en el cupo
+      await client.query('SELECT pg_advisory_xact_lock(2026102201)');
+
+      // Verificar cupo de estudiantes
+      const countRes = await client.query(
+        `SELECT COUNT(*) FROM users WHERE role = 'STUDENT'`
       );
       const studentCount = parseInt(countRes.rows[0].count, 10);
 
       if (studentCount >= 20) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ message: 'El curso ha alcanzado la capacidad máxima de 20 estudiantes.' });
       }
+
+      // Verificar si el correo ya existe
+      const existing = await client.query(`SELECT id FROM users WHERE email = $1`, [cleanEmail]);
+      if (existing.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'El correo electrónico ya se encuentra registrado.' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const insertRes = await client.query(
+        `INSERT INTO users (email, password, name, last_name, phone, role)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, email, name, last_name, phone, role, created_at`,
+        [cleanEmail, hashedPassword, cleanName, cleanLastName, cleanPhone, assignedRole]
+      );
+
+      await client.query('COMMIT');
+      user = insertRes.rows[0];
+    } catch (txError) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw txError;
+    } finally {
+      client.release();
     }
 
-    // Check if email exists
-    const existing = await query(`SELECT id FROM users WHERE email = $1`, [cleanEmail]);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ message: 'El correo electrónico ya se encuentra registrado.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const insertRes = await query(
-      `INSERT INTO users (email, password, name, last_name, phone, role) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, email, name, last_name, phone, role, created_at`,
-      [cleanEmail, hashedPassword, name, lastName || null, phone || null, assignedRole]
-    );
-
-    const user = insertRes.rows[0];
-
-    const jwtSecret = process.env.JWT_SECRET || 'super_secret_jwt_key_java_course_2026';
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
-      jwtSecret,
-      { expiresIn: '7d' }
+      JWT_SECRET,
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     return res.status(201).json({
@@ -75,7 +117,7 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ message: 'Por favor ingresa correo y contraseña.' });
     }
 
@@ -88,23 +130,17 @@ export const login = async (req: Request, res: Response) => {
 
     const user = userRes.rows[0];
 
-    // If it's the admin email, ensure role is ADMIN in DB
-    if (cleanEmail === 'u20232218369@usco.edu.co' && user.role !== 'ADMIN') {
-      await query(`UPDATE users SET role = 'ADMIN' WHERE id = $1`, [user.id]);
-      user.role = 'ADMIN';
-    }
-
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Credenciales incorrectas.' });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'super_secret_jwt_key_java_course_2026';
+    const { JWT_SECRET } = getEnv();
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
-      jwtSecret,
-      { expiresIn: '7d' }
+      JWT_SECRET,
+      { expiresIn: '7d', algorithm: 'HS256' }
     );
 
     return res.json({

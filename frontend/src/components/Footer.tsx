@@ -3,17 +3,19 @@ import { Code } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-white border-t border-gray-200 mt-auto">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-center">
-          <div className="flex items-center gap-2 mb-4 md:mb-0">
-            <div className="bg-blue-600 p-1.5 rounded-md">
-              <Code className="h-5 w-5 text-white" />
+    <footer className="bg-white border-t border-slate-200 mt-auto py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-slate-900 text-white p-1 rounded-md">
+              <Code className="h-4 w-4" />
             </div>
-            <span className="font-bold text-lg text-gray-900 tracking-tight">JavaEdu</span>
+            <span className="font-semibold text-slate-800 tracking-tight">JavaEdu</span>
+            <span className="text-slate-300">|</span>
+            <span>Universidad Surcolombiana</span>
           </div>
-          <p className="text-sm text-gray-500 text-center md:text-left">
-            &copy; {new Date().getFullYear()} Curso de Java. Todos los derechos reservados.
+          <p className="text-center sm:text-right text-slate-500">
+            &copy; {new Date().getFullYear()} Curso Presencial de Java (10 Horas). Todos los derechos reservados.
           </p>
         </div>
       </div>

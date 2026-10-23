@@ -15,7 +15,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="flex flex-col min-h-screen bg-gray-50">
+        <div className="flex flex-col min-h-screen bg-slate-50">
           <Navbar />
           <main className="flex-grow">
             <Routes>
@@ -31,7 +31,7 @@ function App() {
                 <Route path="/module/:id" element={<Module />} />
               </Route>
 
-              {/* Rutas para Administradores */}
+              {/* Ruta para el Docente */}
               <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                 <Route path="/admin" element={<AdminDashboard />} />
               </Route>

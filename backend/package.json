@@ -2,11 +2,15 @@
   "name": "java-course-backend",
   "version": "1.0.0",
   "description": "Backend API for Java Course Platform using Express, TypeScript and Neon PostgreSQL",
+  "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/db', {recursive:true}); fs.copyFileSync('src/db/init.sql', 'dist/db/init.sql');\"",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "db:init": "npm run build && node dist/scripts/initDb.js",
+    "provision:admin": "npm run build && node dist/scripts/provisionAdmin.js",
+    "test": "npm run build && node --experimental-strip-types --test tests/security.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",

@@ -1,13 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getEnv } from '../config/env.js';
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  role: 'ADMIN' | 'STUDENT';
+  name: string;
+}
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: 'ADMIN' | 'STUDENT';
-    name: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -18,13 +21,24 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     return res.status(401).json({ message: 'Token de autenticación no proporcionado.' });
   }
 
-  const jwtSecret = process.env.JWT_SECRET || 'super_secret_jwt_key_java_course_2026';
+  const { JWT_SECRET } = getEnv();
 
-  jwt.verify(token, jwtSecret, (err: any, user: any) => {
-    if (err) {
+  jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err: any, decoded: any) => {
+    if (err || !decoded || typeof decoded !== 'object') {
       return res.status(403).json({ message: 'Token inválido o expirado.' });
     }
-    req.user = user;
+
+    const user = decoded as Partial<AuthenticatedUser>;
+    if (!user.id || !user.role || !['ADMIN', 'STUDENT'].includes(user.role)) {
+      return res.status(403).json({ message: 'Token con estructura o rol no válido.' });
+    }
+
+    req.user = {
+      id: user.id,
+      email: user.email || '',
+      role: user.role as 'ADMIN' | 'STUDENT',
+      name: user.name || ''
+    };
     next();
   });
 };

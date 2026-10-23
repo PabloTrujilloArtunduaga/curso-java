@@ -13,14 +13,18 @@ export const getModules = async (_req: Request, res: Response) => {
 
 export const updateModuleStatus = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const moduleId = Number(req.params.id);
     const { status } = req.body;
+
+    if (!Number.isInteger(moduleId) || moduleId < 1 || moduleId > 5) {
+      return res.status(400).json({ message: 'Identificador de módulo inválido (debe ser del 1 al 5).' });
+    }
 
     if (!['LOCKED', 'OPEN', 'CLOSED'].includes(status)) {
       return res.status(400).json({ message: 'Estado de módulo no válido.' });
     }
 
-    await query(`UPDATE modules SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [status, id]);
+    await query(`UPDATE modules SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [status, moduleId]);
 
     const updatedRes = await query(`SELECT id as "moduleId", title, description, status FROM modules ORDER BY id ASC`);
     return res.json(updatedRes.rows);

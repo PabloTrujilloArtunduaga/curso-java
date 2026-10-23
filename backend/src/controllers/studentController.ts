@@ -7,7 +7,7 @@ export const getStudents = async (_req: AuthenticatedRequest, res: Response) => 
     const studentsRes = await query(
       `SELECT id, email, name, last_name as "lastName", phone, role, created_at as "createdAt"
        FROM users 
-       WHERE role = 'STUDENT' AND email != 'u20232218369@usco.edu.co'
+       WHERE role = 'STUDENT'
        ORDER BY name ASC`
     );
     return res.json(studentsRes.rows);
@@ -19,7 +19,7 @@ export const getStudents = async (_req: AuthenticatedRequest, res: Response) => 
 export const getStudentsCount = async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const countRes = await query(
-      `SELECT COUNT(*) FROM users WHERE role = 'STUDENT' AND email != 'u20232218369@usco.edu.co'`
+      `SELECT COUNT(*) FROM users WHERE role = 'STUDENT'`
     );
     return res.json({ count: parseInt(countRes.rows[0].count, 10) });
   } catch (error) {

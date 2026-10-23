@@ -4,12 +4,10 @@ import { api } from '../../services/api';
 import type { ModuleLock, QRToken, AttendanceRecord, User, ModuleStatusType, ManualAccess } from '../../types';
 import { courseModules } from '../../data/courseData';
 import { QRCodeSVG } from 'qrcode.react';
-import { Lock, QrCode, StopCircle, Key, Award, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Lock, QrCode, StopCircle, Key, Award, CheckCircle, Clock, AlertCircle, ShieldCheck, UserCheck } from 'lucide-react';
 
 export const AdminDashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [locks, setLocks] = useState<ModuleLock[]>([]);
   const [activeSession, setActiveSession] = useState<QRToken | null>(null);
@@ -83,24 +81,18 @@ export const AdminDashboard = () => {
     try {
       const session = await api.createAttendanceSession(selectedModuleForQR, 90);
       
-      if (session) {
+      if (session && session.token) {
         setActiveSession(session);
         setTimeLeft(90);
       } else {
-        // Fallback local seguro si la API de red no responde temporalmente
-        const fallbackToken: QRToken = {
-          id: 'session-' + Date.now(),
-          moduleId: selectedModuleForQR,
-          token: `JAVA-M${selectedModuleForQR}-${Date.now()}`,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 90 * 1000).toISOString()
-        };
-        setActiveSession(fallbackToken);
-        setTimeLeft(90);
+        setActiveSession(null);
+        setTimeLeft(0);
+        setErrorMsg('El servidor no pudo generar una sesión de asistencia válida. Inténtalo de nuevo.');
       }
-    } catch (err) {
-      setErrorMsg('No se pudo iniciar la sesión.');
+    } catch (err: any) {
+      setActiveSession(null);
+      setTimeLeft(0);
+      setErrorMsg(err?.message || 'Error de conexión con el servidor al iniciar la sesión de asistencia.');
     } finally {
       setLoadingQR(false);
     }
@@ -135,148 +127,161 @@ export const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const activeModuleObj = courseModules.find(m => m.id === selectedModuleForQR);
   const activeModuleAttendances = attendances.filter(a => a.moduleId === selectedModuleForQR);
 
-  // Excluir email del admin u20232218369@usco.edu.co del total de cupos
-  const filteredStudents = students.filter(s => s.email !== 'u20232218369@usco.edu.co');
+  // Asegurar que solo usuarios con rol STUDENT sean contabilizados en cupos y listados
+  const filteredStudents = students.filter(s => s.role === 'STUDENT' || (!s.role && s.email !== 'u20232218369@usco.edu.co'));
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-16">
-      {/* Top Navbar Header */}
-      <nav className="bg-slate-900/90 border-b border-purple-900/40 p-4 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-2.5 rounded-xl shadow-lg">
-              <QrCode className="w-6 h-6 text-white" />
-            </div>
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
+      {/* Page Header (replaces inner duplicate nav) */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="font-extrabold text-lg leading-tight text-white">Panel Administrativo</h1>
-              <p className="text-xs text-purple-300 font-medium">Curso Presencial de Java — USCO</p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Administrador del Curso
+                </span>
+                <span className="text-xs text-slate-400">·</span>
+                <span className="text-xs text-slate-500 font-medium">Docente: {user?.name}</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Panel del docente
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                Control de asistencia presencial por código QR, gestión de módulos y excepciones de acceso.
+              </p>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-semibold text-slate-300 hidden md:inline">
-              Profesor: <b className="text-purple-300">{user?.name}</b>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer"
-            >
-              Cerrar Sesión
-            </button>
+
+            {/* Quick Metrics */}
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center">
+                <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Inscritos</span>
+                <span className="text-base font-extrabold text-slate-900">{filteredStudents.length} / 20</span>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-center">
+                <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Módulos Abiertos</span>
+                <span className="text-base font-extrabold text-blue-600">
+                  {locks.filter(l => l.status === 'OPEN').length} / 5
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </nav>
+      </div>
 
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-8 mt-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         {/* Fila 1: Generador de QR & Estado de Módulos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Pantalla Especial de QR */}
-          <section className="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 flex flex-col items-center shadow-xl">
-            <div className="w-full flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-              <div>
-                <h2 className="text-lg font-black text-white flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-purple-400" /> Asistencia — Semana {selectedModuleForQR}
-                </h2>
-                <p className="text-xs text-purple-300 font-medium">{activeModuleObj?.title}</p>
+          <section className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="w-full flex justify-between items-start border-b border-slate-100 pb-4 mb-5">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <QrCode className="w-5 h-5 text-blue-600" /> Asistencia Presencial — Semana {selectedModuleForQR}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">{activeModuleObj?.title}</p>
+                </div>
+
+                <select
+                  value={selectedModuleForQR}
+                  onChange={(e) => setSelectedModuleForQR(Number(e.target.value))}
+                  className="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600"
+                >
+                  {courseModules.map(m => (
+                    <option key={m.id} value={m.id}>Semana {m.id}</option>
+                  ))}
+                </select>
               </div>
 
-              <select
-                value={selectedModuleForQR}
-                onChange={(e) => setSelectedModuleForQR(Number(e.target.value))}
-                className="bg-slate-800 border border-purple-500/30 rounded-xl px-3 py-1.5 text-xs font-bold text-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                {courseModules.map(m => (
-                  <option key={m.id} value={m.id}>Semana {m.id}</option>
-                ))}
-              </select>
+              {errorMsg && (
+                <div className="w-full mb-4 p-3 bg-rose-50 text-rose-700 text-xs rounded-xl flex items-center gap-2 border border-rose-200 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Tarjeta del QR Grande */}
+              {!activeSession ? (
+                <div className="w-full min-h-[300px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                  <div className="bg-white p-3.5 rounded-full border border-slate-200 shadow-xs mb-3">
+                    <QrCode className="w-10 h-10 text-slate-400" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base">Sesión de Asistencia Inactiva</h3>
+                  <p className="text-slate-500 text-xs max-w-xs mt-1 mb-5">
+                    Activa la sesión para proyectar en pantalla el código QR dinámico de 90 segundos para la Semana {selectedModuleForQR}.
+                  </p>
+                  <button
+                    onClick={handleActivateQR}
+                    disabled={loadingQR}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow-xs transition-all text-xs sm:text-sm cursor-pointer flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <QrCode className="w-4 h-4" /> {loadingQR ? 'Generando...' : 'Activar Código QR (90s)'}
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full bg-slate-50 border border-slate-200 p-6 rounded-2xl flex flex-col items-center">
+                  <div className="flex items-center gap-2 mb-4 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-bold text-emerald-700 text-xs tracking-wider uppercase">Sesión de Asistencia Activa</span>
+                  </div>
+
+                  {/* QR grande destacado */}
+                  <div className="bg-white p-4 rounded-xl shadow-xs mb-4 border border-slate-200">
+                    <QRCodeSVG value={activeSession.token} size={200} level="H" />
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-amber-50 px-3.5 py-1 rounded-full border border-amber-200 mb-3">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="text-xs font-bold text-amber-800">Expira en: {timeLeft}s</span>
+                  </div>
+
+                  <div className="text-center mb-5">
+                    <p className="text-sm font-bold text-slate-700">
+                      Asistencia confirmada: <span className="text-blue-600 text-base">{activeModuleAttendances.length}</span> de {filteredStudents.length} estudiantes
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleDeactivateQR}
+                    className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 rounded-xl transition-all text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <StopCircle className="w-4 h-4" /> Finalizar Sesión Anticipadamente
+                  </button>
+                </div>
+              )}
             </div>
 
-            {errorMsg && (
-              <div className="w-full mb-3 p-3 bg-red-900/50 text-red-200 text-xs rounded-xl flex items-center gap-2 border border-red-500/30">
-                <AlertCircle className="w-4 h-4 text-red-400" /> {errorMsg}
-              </div>
-            )}
-
-            {/* Tarjeta del QR Grande */}
-            {!activeSession ? (
-              <div className="w-full flex-1 min-h-[320px] bg-slate-950/60 border-2 border-dashed border-slate-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-                <QrCode className="w-20 h-20 text-slate-700 mb-4 animate-pulse" />
-                <h3 className="font-bold text-white text-lg">Sesión de Asistencia Inactiva</h3>
-                <p className="text-slate-400 text-xs max-w-xs mt-1 mb-6">
-                  Presiona el botón para activar la sesión y proyectar el código QR dinámico en la pantalla del salón.
-                </p>
-                <button
-                  onClick={handleActivateQR}
-                  disabled={loadingQR}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-8 py-3.5 rounded-xl shadow-lg transition-all text-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
-                >
-                  <QrCode className="w-5 h-5" /> {loadingQR ? 'Generando...' : 'Activar Asistencia (90s)'}
-                </button>
-              </div>
-            ) : (
-              <div className="w-full bg-slate-950 p-6 rounded-2xl flex flex-col items-center shadow-2xl border border-purple-900/50">
-                <div className="flex items-center gap-2 mb-4 bg-emerald-950/80 px-4 py-1.5 rounded-full border border-emerald-500/40">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </span>
-                  <span className="font-black text-emerald-400 text-xs tracking-wider uppercase">Sesión: ACTIVA</span>
-                </div>
-
-                {/* QR grande destacado */}
-                <div className="bg-white p-5 rounded-2xl shadow-2xl mb-4 border-4 border-purple-500">
-                  <QRCodeSVG value={activeSession.token} size={220} level="H" />
-                </div>
-
-                <div className="flex items-center gap-2 bg-amber-950/60 px-4 py-1.5 rounded-full border border-amber-500/40 mb-4">
-                  <Clock className="w-4 h-4 text-amber-400 animate-spin" />
-                  <span className="text-xs font-bold text-amber-300">Expira en: {timeLeft}s</span>
-                </div>
-
-                <div className="text-center mb-6">
-                  <p className="text-xl font-black text-white">
-                    Presentes: <span className="text-purple-400">{activeModuleAttendances.length}</span> / {filteredStudents.length}
-                  </p>
-                </div>
-
-                {/* Botón de Desactivar Asistencia */}
-                <button
-                  onClick={handleDeactivateQR}
-                  className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <StopCircle className="w-5 h-5" /> Desactivar Asistencia
-                </button>
-              </div>
-            )}
-
             {/* Asistentes de la sesión */}
-            <div className="w-full mt-6 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-                <span>Estudiantes Confirmados</span>
-                <span className="bg-purple-900/60 text-purple-300 px-2 py-0.5 rounded-full font-bold text-[10px]">
+            <div className="w-full mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-600">
+                  Estudiantes Confirmados (Semana {selectedModuleForQR})
+                </span>
+                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
                   {activeModuleAttendances.length}
                 </span>
-              </h4>
-              <div className="max-h-36 overflow-y-auto space-y-1.5">
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                 {activeModuleAttendances.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Esperando que los estudiantes escaneen el código...</p>
+                  <p className="text-xs text-slate-400 italic py-2">
+                    Ningún estudiante ha registrado asistencia en esta sesión todavía.
+                  </p>
                 ) : (
                   activeModuleAttendances.map(a => {
                     const st = students.find(s => s.id === a.studentId);
                     return (
-                      <div key={a.id} className="text-xs bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center font-medium">
-                        <span className="text-slate-200">{st?.name} {st?.lastName} ({st?.email})</span>
-                        <span className="text-emerald-400 font-bold text-[11px]">✓ Confirmado</span>
+                      <div key={a.id} className="text-xs bg-white p-2.5 rounded-lg border border-slate-200 flex justify-between items-center font-medium shadow-2xs">
+                        <span className="text-slate-800 truncate">{st?.name} {st?.lastName} ({st?.email})</span>
+                        <span className="text-emerald-600 font-semibold text-[11px] shrink-0 ml-2">✓ Confirmado</span>
                       </div>
                     );
                   })
@@ -286,14 +291,16 @@ export const AdminDashboard = () => {
           </section>
 
           {/* Control de Estados de los Módulos */}
-          <section className="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 flex flex-col justify-between shadow-xl">
+          <section className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div>
-              <h2 className="text-lg font-black text-white border-b border-slate-800 pb-3 mb-4 flex items-center gap-2">
-                <Lock className="w-5 h-5 text-purple-400" /> Control de Estados de Módulos
-              </h2>
-              <p className="text-xs text-slate-400 mb-4">
-                Configura la disponibilidad para estudiantes: <b>LOCKED</b> (oculto), <b>OPEN</b> (abierto para registrar asistencia), <b>CLOSED</b> (finalizado).
-              </p>
+              <div className="border-b border-slate-100 pb-4 mb-4">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-blue-600" /> Control de Estados de Módulos
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Define la disponibilidad del contenido: <b>LOCKED</b> (oculto), <b>OPEN</b> (abierto para registrar asistencia), <b>CLOSED</b> (finalizado).
+                </p>
+              </div>
 
               <div className="space-y-3">
                 {courseModules.map(mod => {
@@ -301,22 +308,25 @@ export const AdminDashboard = () => {
                   const currentStatus: ModuleStatusType = lock ? lock.status : 'LOCKED';
 
                   return (
-                    <div key={mod.id} className="p-3.5 bg-slate-950/70 rounded-xl border border-slate-800 flex justify-between items-center">
+                    <div key={mod.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <h3 className="font-bold text-white text-sm">Semana {mod.id}: {mod.title}</h3>
-                        <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded font-black tracking-wider ${
-                          currentStatus === 'OPEN' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-500/40' :
-                          currentStatus === 'CLOSED' ? 'bg-amber-900/60 text-amber-300 border border-amber-500/40' :
-                          'bg-slate-800 text-slate-400'
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-xs">Semana {mod.id}:</span>
+                          <span className="text-xs text-slate-700 font-medium">{mod.title}</span>
+                        </div>
+                        <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider ${
+                          currentStatus === 'OPEN' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          currentStatus === 'CLOSED' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          'bg-slate-200/80 text-slate-600'
                         }`}>
-                          {currentStatus}
+                          {currentStatus === 'OPEN' ? 'DESBLOQUEABLE (OPEN)' : currentStatus === 'CLOSED' ? 'CERRADO (CLOSED)' : 'BLOQUEADO (LOCKED)'}
                         </span>
                       </div>
 
                       <select
                         value={currentStatus}
                         onChange={(e) => handleStatusChange(mod.id, e.target.value as ModuleStatusType)}
-                        className="bg-slate-900 border border-purple-500/30 rounded-xl px-3 py-1.5 text-xs font-bold text-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600 self-start sm:self-auto"
                       >
                         <option value="LOCKED">🔒 LOCKED</option>
                         <option value="OPEN">🔓 OPEN</option>
@@ -327,35 +337,46 @@ export const AdminDashboard = () => {
                 })}
               </div>
             </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Como docente, puedes ingresar a todos los módulos sin restricción de estado.</span>
+            </div>
           </section>
 
         </div>
 
-        {/* Fila 2: Excepción Manual & Listado de Alumnos (Excluyendo Admin) */}
+        {/* Fila 2: Excepción Manual & Listado de Estudiantes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Autorización Manual */}
-          <section className="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 shadow-xl">
-            <h2 className="text-lg font-black text-white border-b border-slate-800 pb-3 mb-4 flex items-center gap-2">
-              <Key className="w-5 h-5 text-purple-400" /> Excepción del Administrador (Acceso Manual)
-            </h2>
+          <section className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="border-b border-slate-100 pb-4 mb-4">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Key className="w-5 h-5 text-blue-600" /> Excepción del docente (Acceso Manual)
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Concede acceso extraordinario a un estudiante específico que justifique su inasistencia presencial.
+              </p>
+            </div>
 
             {grantMessage && (
-              <div className="mb-4 p-3 bg-purple-900/50 text-purple-200 rounded-xl text-xs font-semibold border border-purple-500/40">
-                {grantMessage}
+              <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-semibold border border-blue-200 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>{grantMessage}</span>
               </div>
             )}
 
             <form onSubmit={handleGrantAccess} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Seleccionar Estudiante</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Seleccionar Estudiante</label>
                 <select
                   value={selectedStudentForAccess}
                   onChange={(e) => setSelectedStudentForAccess(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-200"
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600"
                 >
-                  <option value="">-- Seleccionar Alumno --</option>
+                  <option value="">-- Seleccionar Estudiante --</option>
                   {filteredStudents.map(s => (
                     <option key={s.id} value={s.id}>{s.name} {s.lastName} ({s.email})</option>
                   ))}
@@ -363,11 +384,11 @@ export const AdminDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Módulo a Habilitar</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Módulo a Habilitar</label>
                 <select
                   value={selectedModuleForAccess}
                   onChange={(e) => setSelectedModuleForAccess(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-200"
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600"
                 >
                   {courseModules.map(m => (
                     <option key={m.id} value={m.id}>Semana {m.id}: {m.title}</option>
@@ -376,71 +397,81 @@ export const AdminDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Motivo (Opcional)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Motivo de la Excepción (Opcional)</label>
                 <input
                   type="text"
-                  placeholder="Ej: Permiso médico justificado"
+                  placeholder="Ej: Permiso médico justificado o reposición de laboratorio"
                   value={accessReason}
                   onChange={(e) => setAccessReason(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-medium text-slate-200"
+                  className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-600"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={!selectedStudentForAccess}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 text-xs shadow-lg cursor-pointer transition-all"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl disabled:opacity-50 text-xs shadow-xs cursor-pointer transition-all"
               >
                 Conceder Acceso Manual
               </button>
             </form>
           </section>
 
-          {/* Listado de Estudiantes Inscritos (Excluyendo Admin del Contador) */}
-          <section className="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 shadow-xl">
-            <h2 className="text-lg font-black text-white border-b border-slate-800 pb-3 mb-4 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-purple-400" /> Estudiantes Inscritos
-              </span>
-              <span className="bg-purple-900/80 text-purple-300 px-3 py-1 rounded-full text-xs font-extrabold border border-purple-500/30">
-                {filteredStudents.length} / 20 Cupos
-              </span>
-            </h2>
+          {/* Listado de Estudiantes Inscritos */}
+          <section className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="border-b border-slate-100 pb-4 mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-blue-600" /> Estudiantes Inscritos
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">Seguimiento de avance individual y elegibilidad para certificación.</p>
+                </div>
+                <span className="bg-slate-100 text-slate-800 px-3 py-1 rounded-full text-xs font-bold border border-slate-200">
+                  {filteredStudents.length} / 20 Cupos
+                </span>
+              </div>
 
-            <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
-              {filteredStudents.length === 0 ? (
-                <p className="text-slate-500 text-xs italic">No hay estudiantes inscritos aún en el sistema.</p>
-              ) : (
-                filteredStudents.map(st => {
-                  const studentAttendances = attendances.filter(a => a.studentId === st.id);
-                  const studentManual = manualAccesses.filter(m => m.studentId === st.id);
-                  const completedCount = new Set([
-                    ...studentAttendances.map(a => a.moduleId),
-                    ...studentManual.map(m => m.moduleId)
-                  ]).size;
-                  const progressPct = Math.round((completedCount / courseModules.length) * 100);
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                {filteredStudents.length === 0 ? (
+                  <p className="text-slate-400 text-xs italic py-4">No hay estudiantes inscritos aún en el sistema.</p>
+                ) : (
+                  filteredStudents.map(st => {
+                    const studentAttendances = attendances.filter(a => a.studentId === st.id);
+                    const studentManual = manualAccesses.filter(m => m.studentId === st.id);
+                    const completedCount = new Set([
+                      ...studentAttendances.map(a => a.moduleId),
+                      ...studentManual.map(m => m.moduleId)
+                    ]).size;
+                    const progressPct = Math.round((completedCount / courseModules.length) * 100);
 
-                  return (
-                    <div key={st.id} className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-white text-xs">{st.name} {st.lastName}</p>
-                        <p className="text-[11px] text-slate-400">{st.email}</p>
+                    return (
+                      <div key={st.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center hover:bg-slate-100/60 transition-colors">
+                        <div>
+                          <p className="font-semibold text-slate-900 text-xs">{st.name} {st.lastName}</p>
+                          <p className="text-[11px] text-slate-500">{st.email}</p>
+                        </div>
+                        <div className="text-right">
+                          {progressPct === 100 ? (
+                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
+                              <CheckCircle className="w-3 h-3" /> Apto Certificación
+                            </span>
+                          ) : (
+                            <span className="bg-slate-100 text-slate-700 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-slate-200">
+                              {progressPct}% Progreso
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        {progressPct === 100 ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-900/60 text-emerald-300 text-[10px] px-2.5 py-0.5 rounded-full font-extrabold border border-emerald-500/40">
-                            <CheckCircle className="w-3 h-3" /> Apto Certificación
-                          </span>
-                        ) : (
-                          <span className="bg-purple-900/60 text-purple-300 text-[10px] px-2.5 py-0.5 rounded-full font-bold border border-purple-500/30">
-                            {progressPct}% Progreso
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Mínimo para abrir curso: <b>10</b></span>
+              <span>Límite máximo de admisión: <b>20</b></span>
             </div>
           </section>
 

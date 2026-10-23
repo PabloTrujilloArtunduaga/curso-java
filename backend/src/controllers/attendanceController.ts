@@ -3,12 +3,20 @@ import { query } from '../db/index.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { cryptoNative } from '../utils/crypto.js';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export const createSession = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { moduleId, durationSeconds = 60 } = req.body;
+    const rawModuleId = req.body.moduleId;
+    const moduleId = Number(rawModuleId);
+    const durationSeconds = req.body.durationSeconds !== undefined ? Number(req.body.durationSeconds) : 60;
 
-    if (!moduleId) {
-      return res.status(400).json({ message: 'Se requiere moduleId.' });
+    if (!Number.isInteger(moduleId) || moduleId < 1 || moduleId > 5) {
+      return res.status(400).json({ message: 'Identificador de módulo inválido (debe ser del 1 al 5).' });
+    }
+
+    if (!Number.isInteger(durationSeconds) || durationSeconds < 10 || durationSeconds > 600) {
+      return res.status(400).json({ message: 'La duración de la sesión debe ser un entero entre 10 y 600 segundos.' });
     }
 
     // Inactivate existing sessions for this module
@@ -34,6 +42,9 @@ export const createSession = async (req: AuthenticatedRequest, res: Response) =>
 export const closeSession = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id || !UUID_REGEX.test(id)) {
+      return res.status(400).json({ message: 'Identificador de sesión inválido.' });
+    }
     await query(`UPDATE attendance_sessions SET is_active = FALSE WHERE id = $1`, [id]);
     return res.json({ message: 'Sesión de asistencia desactivada.' });
   } catch (error) {
@@ -43,7 +54,11 @@ export const closeSession = async (req: AuthenticatedRequest, res: Response) => 
 
 export const getActiveSession = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { moduleId } = req.params;
+    const moduleId = parseInt(req.params.moduleId, 10);
+    if (isNaN(moduleId) || moduleId < 1 || moduleId > 5) {
+      return res.status(400).json({ message: 'Identificador de módulo inválido.' });
+    }
+
     const sessionRes = await query(
       `SELECT id, module_id as "moduleId", token, is_active as "isActive", created_at as "createdAt", expires_at as "expiresAt"
        FROM attendance_sessions
@@ -66,11 +81,17 @@ export const getActiveSession = async (req: AuthenticatedRequest, res: Response)
 export const registerAttendance = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const studentId = req.user?.id;
-    const { token } = req.body;
+    const rawToken = req.body.token;
 
-    if (!studentId || !token) {
-      return res.status(400).json({ message: 'Token de asistencia requerido.' });
+    if (!studentId || !UUID_REGEX.test(studentId)) {
+      return res.status(401).json({ message: 'Identificador de estudiante inválido o no autenticado.' });
     }
+
+    if (typeof rawToken !== 'string' || rawToken.trim().length < 10 || rawToken.trim().length > 255) {
+      return res.status(400).json({ message: 'Token de asistencia requerido con formato válido.' });
+    }
+
+    const token = rawToken.trim();
 
     // 1. Verify token & active session
     const sessionRes = await query(
@@ -85,7 +106,7 @@ export const registerAttendance = async (req: AuthenticatedRequest, res: Respons
     const session = sessionRes.rows[0];
 
     if (!session.is_active) {
-      return res.status(400).json({ message: 'Esta sesión de asistencia ya fue desactivada por el profesor.' });
+      return res.status(400).json({ message: 'Esta sesión de asistencia ya fue desactivada por el docente.' });
     }
 
     if (new Date(session.expires_at) < new Date()) {
@@ -145,17 +166,25 @@ export const getAttendances = async (req: AuthenticatedRequest, res: Response) =
 export const grantManualAccess = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const adminId = req.user?.id;
-    const { studentId, moduleId, reason } = req.body;
+    const { studentId, moduleId: rawModuleId, reason } = req.body;
 
-    if (!studentId || !moduleId) {
-      return res.status(400).json({ message: 'Estudiante y módulo son obligatorios.' });
+    const moduleId = Number(rawModuleId);
+
+    if (!studentId || typeof studentId !== 'string' || !UUID_REGEX.test(studentId)) {
+      return res.status(400).json({ message: 'Identificador de estudiante inválido.' });
     }
+
+    if (!Number.isInteger(moduleId) || moduleId < 1 || moduleId > 5) {
+      return res.status(400).json({ message: 'Identificador de módulo inválido (debe ser del 1 al 5).' });
+    }
+
+    const cleanReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : null;
 
     await query(
       `INSERT INTO manual_access (student_id, module_id, granted_by, reason)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (student_id, module_id) DO NOTHING`,
-      [studentId, moduleId, adminId, reason || null]
+      [studentId, moduleId, adminId, cleanReason]
     );
 
     return res.json({ message: 'Acceso manual concedido correctamente.' });

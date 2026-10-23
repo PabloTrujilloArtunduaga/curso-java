@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Code, CheckCircle, Mail } from 'lucide-react';
+import { Code, CheckCircle, Mail, AlertCircle, Users } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -40,10 +40,9 @@ export const Register = () => {
     setError('');
     
     const cleanEmail = email.trim().toLowerCase();
-    const isAdminEmail = cleanEmail === 'u20232218369@usco.edu.co';
 
-    // Excluir email de profesor del conteo de cupo máximo
-    if (!isAdminEmail && capacity !== null && capacity >= 20) {
+    // Verificación de capacidad máxima de estudiantes inscritos
+    if (capacity !== null && capacity >= 20) {
       setError('El curso ha alcanzado su capacidad máxima (20 estudiantes).');
       return;
     }
@@ -97,26 +96,27 @@ export const Register = () => {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 py-12 px-4">
-        <div className="max-w-md w-full bg-slate-900 text-white p-8 rounded-3xl shadow-2xl text-center border border-emerald-500/40">
-          <div className="bg-emerald-950/80 p-4 rounded-2xl w-fit mx-auto mb-4 border border-emerald-500/40">
-            <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
+      <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6">
+        <div className="max-w-md w-full bg-white text-slate-900 p-8 sm:p-10 rounded-2xl shadow-xs text-center border border-slate-200">
+          <div className="bg-emerald-50 p-4 rounded-full w-fit mx-auto mb-4 border border-emerald-100">
+            <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto" />
           </div>
           
-          <h2 className="text-3xl font-black text-white mb-2">¡Inscripción Exitosa!</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-2">¡Inscripción Exitosa!</h2>
+          <p className="text-xs text-slate-600 mb-6">Tu cupo para el Curso Presencial de Java ha sido reservado satisfactoriamente.</p>
           
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-slate-300 text-xs text-left mb-6 space-y-2">
-            <p className="flex items-center gap-2 text-emerald-400 font-bold">
-              <Mail className="w-4 h-4" /> Correo de confirmación enviado:
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 text-xs text-left mb-6 space-y-2">
+            <p className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+              <Mail className="w-4 h-4 shrink-0" /> Confirmación enviada:
             </p>
-            <p className="text-slate-400 italic">
-              "Inscripción exitosa al curso presencial de Java de 10 horas. Tu cuenta ha sido activada correctamente."
+            <p className="text-slate-600 italic">
+              "Inscripción exitosa al curso presencial de Java de 10 horas. Tu cuenta de estudiante ha sido activada correctamente."
             </p>
           </div>
 
           <Link 
             to="/dashboard" 
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black py-3.5 px-4 rounded-xl block transition-all shadow-lg text-sm"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl block transition-all shadow-xs text-xs sm:text-sm"
           >
             Ir a mi Panel de Estudiante
           </Link>
@@ -126,83 +126,102 @@ export const Register = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-6 bg-slate-900/90 text-white p-8 rounded-3xl shadow-2xl border border-slate-800 backdrop-blur-md">
-        <div className="flex flex-col items-center">
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-3.5 rounded-2xl mb-3 shadow-lg">
-            <Code className="h-8 w-8 text-white" />
+    <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6 bg-white text-slate-900 p-8 sm:p-10 rounded-2xl shadow-xs border border-slate-200">
+        <div className="flex flex-col items-center text-center">
+          <div className="bg-blue-600 text-white p-3 rounded-xl shadow-xs mb-3">
+            <Code className="h-6 w-6" />
           </div>
-          <h2 className="text-center text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             Inscripción al Curso
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">Curso Presencial de Java (10 Horas)</p>
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">Curso Presencial de Java (10 Horas) — USCO</p>
           
           {capacity !== null && (
-            <div className="mt-3 text-xs font-bold text-slate-300 bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 flex flex-col items-center gap-1">
-              <span>Cupos Estudiantiles Ocupados: <b className={capacity >= 20 ? 'text-red-400' : 'text-purple-400'}>{capacity} / 20</b></span>
-              {capacity < 10 && <span className="text-[11px] text-amber-400 font-normal">Faltan {10 - capacity} inscripciones para alcanzar el mínimo de 10.</span>}
+            <div className="mt-4 w-full text-xs text-slate-700 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <Users className="w-3.5 h-3.5 text-slate-500" />
+                <span>Cupos Ocupados: <b className={capacity >= 20 ? 'text-rose-600' : 'text-blue-600'}>{capacity} / 20</b></span>
+              </div>
+              {capacity < 10 && (
+                <span className="text-[11px] text-amber-700 font-medium">
+                  Faltan {10 - capacity} inscripciones para el mínimo requerido de 10.
+                </span>
+              )}
             </div>
           )}
         </div>
         
         <form className="mt-4 space-y-4" onSubmit={handleRegister}>
           {error && (
-            <div className="bg-red-950/80 text-red-200 p-3.5 rounded-xl text-xs text-center border border-red-500/40 font-semibold">
-              {error}
+            <div className="bg-rose-50 text-rose-700 p-3 rounded-xl text-xs text-center border border-rose-200 font-medium flex items-center justify-center gap-1.5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre(s)</label>
+              <label htmlFor="reg-name" className="block text-xs font-semibold text-slate-700 mb-1">Nombre(s)</label>
               <input
+                id="reg-name"
                 type="text" required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                placeholder="Juan"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                 value={name} onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Apellidos</label>
+              <label htmlFor="reg-lastname" className="block text-xs font-semibold text-slate-700 mb-1">Apellidos</label>
               <input
+                id="reg-lastname"
                 type="text" required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                placeholder="Pérez"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                 value={lastName} onChange={(e) => setLastName(e.target.value)}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Correo Electrónico (Gmail / Institucional)</label>
+            <label htmlFor="reg-email" className="block text-xs font-semibold text-slate-700 mb-1">Correo Electrónico (Gmail / Institucional)</label>
             <input
-              type="email" required placeholder="ej: estudiante@gmail.com"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+              id="reg-email"
+              type="email" required placeholder="estudiante@usco.edu.co"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
               value={email} onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Teléfono (Opcional)</label>
+            <label htmlFor="reg-phone" className="block text-xs font-semibold text-slate-700 mb-1">Teléfono (Opcional)</label>
             <input
+              id="reg-phone"
               type="tel"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+              placeholder="+57 300 123 4567"
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
               value={phone} onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Contraseña</label>
+              <label htmlFor="reg-password" className="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
               <input
+                id="reg-password"
                 type="password" required minLength={6}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                placeholder="••••••"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                 value={password} onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Confirmar</label>
+              <label htmlFor="reg-confirm" className="block text-xs font-semibold text-slate-700 mb-1">Confirmar</label>
               <input
+                id="reg-confirm"
                 type="password" required minLength={6}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                placeholder="••••••"
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                 value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
@@ -210,16 +229,17 @@ export const Register = () => {
 
           <button
             type="submit"
-            disabled={loading || (email.trim().toLowerCase() !== 'u20232218369@usco.edu.co' && capacity !== null && capacity >= 20)}
-            className="w-full justify-center py-3.5 px-4 border border-transparent text-sm font-black rounded-xl text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl transition-all cursor-pointer"
+            disabled={loading || (capacity !== null && capacity >= 20)}
+            className="w-full justify-center py-3 px-4 border border-transparent text-xs sm:text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xs transition-all cursor-pointer"
           >
-            {loading ? 'Completando Registro...' : (capacity !== null && capacity >= 20 && email.trim().toLowerCase() !== 'u20232218369@usco.edu.co') ? 'Cupos Agotados' : 'Completar Inscripción'}
+            {loading ? 'Completando Registro...' : (capacity !== null && capacity >= 20) ? 'Cupos Agotados (20/20)' : 'Completar Inscripción'}
           </button>
         </form>
         
-        <div className="text-xs text-center mt-4">
-          <Link to="/login" className="font-semibold text-slate-400 hover:text-purple-400 transition-colors">
-            ¿Ya tienes cuenta? <span className="text-purple-400 underline font-bold">Inicia sesión</span>
+        <div className="text-xs text-center text-slate-500 pt-2 border-t border-slate-100">
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+            Inicia sesión aquí
           </Link>
         </div>
       </div>
